@@ -1,7 +1,9 @@
 from PIL import Image, ImageDraw, ImageFont
-from math import ceil
+from math import ceil, sqrt
 import os
 import gi
+import tweepy
+import webbrowser
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 import sys
@@ -10,54 +12,79 @@ import sys
 respuesta_afirmativa = ["sí", "si", "yes", "y", "s"]
 respuesta_negativa = ["no", "n"]
 
-menu_principal_str = "a) Imagen\n" \
+menu_principal_str = "------Menu principal------\n" \
+                     "a) Imagen\n" \
                      "b) Opciones de Twitter\n" \
                      "c) Ayuda\n" \
                      "x) Salir\n" \
                      " "
 
-menu_a_1_str = "1) Cargar Imagen\n" \
+menu_a_1_str = "------Imagen------\n" \
+               "1) Cargar Imagen\n" \
                "0) Atrás\n" \
                "x) Salir\n" \
                " "
-menu_a_2_str = "1) Cargar Imagen\n" \
+menu_a_2_str = "------Imagen------\n" \
+               "1) Cargar Imagen\n" \
                "2) Guardar arte acsii generado\n" \
                "3) Mostrar comparación\n" \
                "0) Atrás\n" \
                "x) Salir\n" \
                " "
-menu_a_guardado = "1) Guardar Imagen\n" \
+menu_a_guardado = "------Guardar------\n" \
+                  "1) Guardar Imagen\n" \
                   "2) Guardar Texto\n" \
                   "3) Cambiar nombre\n" \
                   "0) Atrás\n" \
                   "x) Salir\n" \
                   " "
 menu_a_ajustes = "Selecciona el aspecto que quieras cambiar o ingresa 0 para continuar\n" \
+                 "------Ajustes de Imagen------\n" \
                  "1) Nueva escala ACSII\n" \
                  "2) Invertir colores\n" \
                  "3) Cambiar tamaño\n" \
                  "4) Regresar a la configuración por defecto\n" \
                  "0) Continuar\n" \
                  " "
-mostrar_str = "1) Imágenes por separado (recomendado)\n" \
+mostrar_str = "------Comparación de Imagen------\n" \
+              "1) Imágenes por separado (recomendado)\n" \
               "2) Imágenes juntas\n" \
               " "
 
-menu_b_1_str = "1) Ingresar credenciales\n" \
+menu_b_1_str = "------Twitter------\n" \
+               "1) Ingresar credenciales\n" \
                "0) Atrás\n" \
                "x) Salir\n" \
                " "
-menu_b_2_str = "1) Ingresar credenciales\n" \
+menu_b_3_str = "------Twitter------\n" \
+               "1) Ingresar credenciales\n" \
+               "2) Logout\n" \
+               "3) Tweet\n" \
+               "0) Atrás\n" \
+               "x) Salir\n" \
+               " "
+tweet_str = "------Tweet------\n" \
+            "1) Tweet de imagen (recomendado)\n" \
+            "2) Tweet de texto (muy limitado)\n" \
+            " "
+menu_b_2_str = "------Twitter------\n" \
+               "1) Ingresar credenciales\n" \
                "2) Logout\n" \
                "0) Atrás\n" \
                "x) Salir\n" \
                " "
 
-menu_c_str = "1) Acerca de\n" \
+menu_c_str = "------Ayuda------\n" \
+             "1) Acerca de\n" \
              "2) Código fuente\n" \
              "0) Atrás\n" \
              "x) Salir\n" \
              " "
+
+consumer_key = os.environ.get("consumer_key")
+consumer_secret = os.environ.get("consumer_secret")
+
+callback_uri = 'oob'  # https://cfe.sh/twitter/callback
 
 
 # Para imprimir las opciones y devolver la opcion elegida si es válida.
@@ -97,19 +124,19 @@ def voltear_cadena(cadena):
     return resultado
 
 
-def resize_img_normal(image, new_width=191):
-    width, height = image.size
-    ratio = height / width
-    new_height = int(new_width * ratio)
-    resized_image = image.resize((new_width, new_height))
+def resize_img_normal(image, nuevo_ancho_f=191):
+    ancho_f, alto_f = image.size
+    proporcion = alto_f / ancho_f
+    nuevo_alto_f = int(nuevo_ancho_f * proporcion)
+    resized_image = image.resize((nuevo_ancho_f, nuevo_alto_f))
     return resized_image
 
 
-def resize_img(image, new_width=191):
-    width, height = image.size
-    ratio = height / width / 1.65
-    new_height = int(new_width * ratio)
-    resized_image = image.resize((new_width, new_height))
+def resize_img(image, nuevo_ancho_f=191):
+    ancho_f, alto_f = image.size
+    proporcion_f = alto_f / ancho_f / 1.65
+    nuevo_alto_f = int(nuevo_ancho_f * proporcion_f)
+    resized_image = image.resize((nuevo_ancho_f, nuevo_alto_f))
     return resized_image
 
 
@@ -152,12 +179,6 @@ def arte_acsii(ruta, cadena_ascii=cadena_por_defecto, nuevo_ancho=0, invertir_co
 
 
 def imagen_acsii(cadena_organizada):
-    # # print result
-    # print(cadena_acsii_organizada)
-
-    # # save result to "ascii_image.txt"
-    # with open("ascii_image.txt", "w") as f:
-    #     f.write(cadena_acsii_organizada)
 
     lineas = 1
     todas_las_lineas = [[]]
@@ -179,7 +200,6 @@ def imagen_acsii(cadena_organizada):
 
     d = ImageDraw.Draw(img)
     d.multiline_text((0, 0), cadena_organizada, font=font, fill="black")
-    # fill=(255, 0, 0) da un color rojo
     return img
 
 
@@ -235,7 +255,7 @@ class VentanaCF(Gtk.ApplicationWindow):
         self.set_default_size(250, 50)
 
         # a linkbutton pointing to the given URI
-        button = Gtk.LinkButton(uri="https://youtu.be/LACbVhgtx9I")
+        button = Gtk.LinkButton(uri="https://github.com/Obsdy/Arte-ACSII")
         # with given text
         button.set_label("Arte ACSII")
 
@@ -265,12 +285,16 @@ class AcercaDeVentana(Gtk.ApplicationWindow):
 
         label_t = Gtk.Label(label="  Tecnologías:  ")
         label_v = Gtk.Label(label="  Versiones:  ")
+
         label_t1 = Gtk.Label(label="Python")
         label_t2 = Gtk.Label(label="Gtk+")
         label_t3 = Gtk.Label(label="Pillow")
+        label_t4 = Gtk.Label(label="Tweepy")
+
         label_v1 = Gtk.Label(label="3.8")
         label_v2 = Gtk.Label(label="3.0")
         label_v3 = Gtk.Label(label="8.0")
+        label_v4 = Gtk.Label(label="3.9")
 
         label_a = Gtk.Label(label="  Autor:  ")
         label_a1 = Gtk.Label(label="  Obsdy Jedadías Chet Morales  ")
@@ -300,22 +324,25 @@ class AcercaDeVentana(Gtk.ApplicationWindow):
         grid.attach(label_t3, 0, 4, 1, 1)
         grid.attach(label_v3, 1, 4, 1, 1)
 
-        grid.attach(hseparator1, 0, 5, 2, 1)
+        grid.attach(label_t4, 0, 5, 1, 1)
+        grid.attach(label_v4, 1, 5, 1, 1)
 
-        grid.attach(label_a, 0, 6, 2, 1)
-        grid.attach(label_a1, 0, 7, 2, 1)
+        grid.attach(hseparator1, 0, 6, 2, 1)
 
-        grid.attach(hseparator2, 0, 8, 2, 1)
+        grid.attach(label_a, 0, 7, 2, 1)
+        grid.attach(label_a1, 0, 8, 2, 1)
 
-        grid.attach(label_f, 0, 9, 2, 1)
-        grid.attach(label_f1, 0, 10, 2, 1)
+        grid.attach(hseparator2, 0, 9, 2, 1)
 
-        grid.attach(hseparator3, 0, 11, 2, 1)
+        grid.attach(label_f, 0, 10, 2, 1)
+        grid.attach(label_f1, 0, 11, 2, 1)
 
-        grid.attach(label_ve, 0, 12, 2, 1)
-        grid.attach(label_ve1, 0, 13, 2, 1)
+        grid.attach(hseparator3, 0, 12, 2, 1)
 
-        grid.attach(hseparator4, 0, 14, 2, 1)
+        grid.attach(label_ve, 0, 13, 2, 1)
+        grid.attach(label_ve1, 0, 14, 2, 1)
+
+        grid.attach(hseparator4, 0, 15, 2, 1)
 
         # Supongo que el orden correcto es (child, left, top, width, height)
 
@@ -339,7 +366,10 @@ arte_str = ""
 cadena_imagen = ""
 cadena_imagen += ""
 
-credenciales_usuario = " "
+credenciales_usuario = False
+auth = " "
+redirect_url = " "
+api = " "
 # ----------------------------------------------------------------------------------------------- Programa Principal
 while True:
     menu_principal_respuesta = prueba(menu_principal_str, ["a", "b", "c", "x"])
@@ -359,7 +389,7 @@ while True:
                 break
             elif menu_a_respuesta == "x":
                 cerrar = True
-                break
+                sys.exit(exit_status)
             elif menu_a_respuesta == "1":
 
                 cadena_acsii_input = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/|()1{}[]?-_+~<>i!lI;:,\"^."
@@ -454,7 +484,9 @@ while True:
         menu_b_respuesta += ""
         cerrar = False
         while True:
-            if credenciales_usuario != " ":
+            if credenciales_usuario and arte_imagen != " ":
+                menu_b_respuesta = prueba(menu_b_3_str, ["1", "2", "3", "0", "x"])
+            elif credenciales_usuario:
                 menu_b_respuesta = prueba(menu_b_2_str, ["1", "2", "0", "x"])
             else:
                 menu_b_respuesta = prueba(menu_b_1_str, ["1", "0", "x"])
@@ -464,6 +496,63 @@ while True:
             elif menu_b_respuesta == "x":
                 cerrar = True
                 break
+            elif menu_b_respuesta == "1":
+                auth = tweepy.OAuthHandler(consumer_key, consumer_secret, callback_uri)
+                redirect_url = auth.get_authorization_url()
+                webbrowser.open(redirect_url)
+                user_pint_input = input("Ingresa el pin para otorgar permiso: ")
+                auth.get_access_token(user_pint_input)
+                api = tweepy.API(auth)
+                credenciales_usuario = True
+
+            elif menu_b_respuesta == "2":
+                while True:
+                    print("Para cerrar la sesión se mostrará la misma pestaña con la que ingresaste.\n"
+                          "Selecciona el ícono con la imagen de tu cuenta y cierra la sesión.\n"
+                          "Por el momento, así como no podemos abrir la cuenta por ti, tampoco podemos cerrarla.\n")
+                    input("Presiona enter para continuar\n")
+                    auth = tweepy.OAuthHandler(consumer_key, consumer_secret, callback_uri)
+                    redirect_url = auth.get_authorization_url()
+                    webbrowser.open(redirect_url)
+                    print("Ahora confirmaremos que efectivamente has cerrado sesión")
+                    input("Presiona enter para continuar y cierra la pestaña después de haber verificado.\n")
+                    webbrowser.open(redirect_url)
+                    enter = input("¿Has finalizado sesión? (sí/no)\n")
+                    if enter in respuesta_afirmativa:
+                        auth = " "
+                        redirect_url = " "
+                        api = " "
+                        credenciales_usuario = False
+                        break
+                    elif enter in respuesta_negativa:
+                        pass
+
+            elif menu_b_respuesta == "3":
+                tweet_respuesta = prueba(tweet_str, ["1", "2"])
+                if tweet_respuesta == "1":
+                    # arte_imagen_mediano = resize_img_normal(arte_imagen, 800)
+                    directorio_actual = os.getcwd()
+                    im_2 = directorio_actual + "/Proceso/Img_Twt.PNG"
+                    arte_imagen.save(im_2)
+                    size = os.path.getsize(im_2)
+                    if size > 4883000:
+                        print("La imagen es muy grande, no se puede publicar")
+                        print("Intenta cambiando el tamaño al crear el arte ACSII")
+                    else:
+                        img_obj = api.media_upload(im_2)
+                        new_status = api.update_status("#ASCIIArtPM1", media_ids=[img_obj.media_id_string])
+                elif tweet_respuesta == "2":
+                    if len(arte_str) > 268:
+                        print("El máximo de caracteres en Twitter es de 280, quitando #ASCIIArtPM1 el límite es 268.")
+                        print("La imagen que convertiste tiene " + str(len(arte_str)) + " caracteres")
+                        datos = arte_str.split("\n")
+                        ancho_str = len(datos[0])
+                        proporcion_lado = sqrt(268 / len(arte_str))
+                        print("Para poder publicarlo te recomiendo hacer de nuevo la imagen pero cambiando el ancho a "
+                              + str(int(ancho_str * proporcion_lado)))
+                    else:
+                        new_status = api.update_status("#ASCIIArtPM1\n" + arte_str)
+
         if cerrar:
             break
 
@@ -487,5 +576,3 @@ while True:
 
         if cerrar:
             break
-
-sys.exit(exit_status)
