@@ -530,7 +530,6 @@ while True:
             elif menu_b_respuesta == "3":
                 tweet_respuesta = prueba(tweet_str, ["1", "2"])
                 if tweet_respuesta == "1":
-                    # arte_imagen_mediano = resize_img_normal(arte_imagen, 800)
                     directorio_actual = os.getcwd()
                     im_2 = directorio_actual + "/Proceso/Img_Twt.PNG"
                     arte_imagen.save(im_2)
@@ -538,6 +537,15 @@ while True:
                     if size > 4883000:
                         print("La imagen es muy grande, no se puede publicar")
                         print("Intenta cambiando el tamaño al crear el arte ACSII")
+                        enter = input("Quieres publicar la imagen a pesar de perder calidad? (sí/no)\n")
+                        if enter in respuesta_afirmativa:
+                            arte_imagen_mediano = resize_img_normal(arte_imagen, 600)
+                            directorio_actual = os.getcwd()
+                            im_2 = directorio_actual + "/Proceso/Img_Twt.PNG"
+                            arte_imagen.save(im_2)
+                            img_obj = api.media_upload(im_2)
+                            new_status = api.update_status("#ASCIIArtPM1", media_ids=[img_obj.media_id_string])
+
                     else:
                         img_obj = api.media_upload(im_2)
                         new_status = api.update_status("#ASCIIArtPM1", media_ids=[img_obj.media_id_string])
